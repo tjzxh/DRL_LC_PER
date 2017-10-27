@@ -7,7 +7,7 @@ from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.optimizers import Adam
 import tensorflow as tf
-#from keras.engine.training import collect_trainable_weights
+# from keras.engine.training import collect_trainable_weights
 import json
 
 from ReplayBuffer import ReplayBuffer
@@ -23,18 +23,19 @@ import socketserver
 import h5py
 from random import choice
 
-OU = OU()       #Ornstein-Uhlenbeck Process
+OU = OU()  # Ornstein-Uhlenbeck Process
 
-def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
+
+def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
     BUFFER_SIZE = 100000
     BATCH_SIZE = 32
     GAMMA = 0.99
-    TAU = 0.001     #Target Network HyperParameters
-    LRA = 0.0001    #Learning rate for Actor
-    LRC = 0.001     #Lerning rate for Critic
+    TAU = 0.001  # Target Network HyperParameters
+    LRA = 0.0001  # Learning rate for Actor
+    LRC = 0.001  # Lerning rate for Critic
 
-    action_dim = 2  #Acceleration/LaneChanging
-    state_dim = 26  #of sensors input
+    action_dim = 2  # Acceleration/LaneChanging
+    state_dim = 26  # of sensors input
 
     np.random.seed(1337)
 
@@ -45,7 +46,7 @@ def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
     step = 0
     epsilon = 1
 
-    #Tensorflow GPU optimization
+    # Tensorflow GPU optimization
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
@@ -54,18 +55,16 @@ def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
 
     actor = ActorNetwork(sess, state_dim, action_dim, BATCH_SIZE, TAU, LRA)
     critic = CriticNetwork(sess, state_dim, action_dim, BATCH_SIZE, TAU, LRC)
-    buff = ReplayBuffer(BUFFER_SIZE)    #Create replay buffer
+    buff = ReplayBuffer(BUFFER_SIZE)  # Create replay buffer
 
-
-
-    #Now load the weight
+    # Now load the weight
     print("Now we load the weight")
     try:
         actor.model.load_weights("actormodel.h5")
         print("actor Weight load successfully")
 
         actor.target_model.load_weights("actor_target_model.h5")
-        
+
     except:
         print("Cannot find the actor weight")
 
@@ -73,24 +72,24 @@ def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
         critic.model.load_weights("criticmodel.h5")
         critic.target_model.load_weights("critic_target_model.h5")
         print("critic Weight load successfully")
-    
+
     except:
         print("Cannot find the critic weight")
 
     HOST = '127.0.0.1'
     PORT = 5099
     BUFSIZ = 1024
-    ADDR = (HOST, PORT) 
+    ADDR = (HOST, PORT)
     socketserver.TCPServer.allow_reuse_address = True
     tcpSerSock = socket(AF_INET, SOCK_STREAM)
     tcpSerSock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-    tcpSerSock.bind(ADDR) 
+    tcpSerSock.bind(ADDR)
     tcpSerSock.listen(5)
 
-    #while True:
+    # while True:
     print ('waiting for connection...')
     tcpCliSock, addr = tcpSerSock.accept()
-    print ('...connected from:',addr)
+    print ('...connected from:', addr)
 
     #save Reward file
     with open("r_l_q_everyeposide.txt", "w") as f:
