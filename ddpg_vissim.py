@@ -27,8 +27,11 @@ OU = OU()  # Ornstein-Uhlenbeck Process
 
 
 def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
-    BUFFER_SIZE = 100000
-    BATCH_SIZE = 32
+    BUFFER_SIZE0 = 100000
+    BUFFER_SIZE1 = 100000
+    BUFFER_SIZE2 = 100000
+    BUFFER_SIZE3 = 100000
+    BATCH_SIZE = 16
     GAMMA = 0.99
     TAU = 0.001  # Target Network HyperParameters
     LRA = 0.0001  # Learning rate for Actor
@@ -55,8 +58,10 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
 
     actor = ActorNetwork(sess, state_dim, action_dim, BATCH_SIZE, TAU, LRA)
     critic = CriticNetwork(sess, state_dim, action_dim, BATCH_SIZE, TAU, LRC)
-    buff = ReplayBuffer(BUFFER_SIZE)  # Create replay buffer
-
+    buff0 = ReplayBuffer(BUFFER_SIZE0)  # Create replay buffer
+    buff1 = ReplayBuffer(BUFFER_SIZE1)
+    buff2 = ReplayBuffer(BUFFER_SIZE2)
+    buff3 = ReplayBuffer(BUFFER_SIZE3)
     # Now load the weight
     print("Now we load the weight")
     try:
@@ -96,7 +101,7 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
         print("Vissim Experiment Start.")
         for i in range(episode_count):
 
-            print("Episode : " + str(i) + " Replay Buffer " + str(buff.num_experiences))
+            print("Episode : " + str(i) + " Replay Buffer0 " + str(buff0.num_experiences) + " Replay Buffer1 " + str(buff1.num_experiences) + " Replay Buffer2 " + str(buff2.num_experiences) + " Replay Buffer3 " + str(buff3.num_experiences))
 
             data0 = tcpCliSock.recv(BUFSIZ)
             Vx0 = struct.unpack("30d", data0)[0]
@@ -233,24 +238,57 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                     r_t = aux
                 elif LaneChanging ==0:
                     r_t = env.step(acceleration,LaneChanging,raw_obs)
-                print('r_t=',r_t)
+
+                if i == 0 and j == 0:
+                    r_t = 0
+
+                print('r_t=', r_t)
 
                 s_t1 = env.make_observaton(raw_obs)
 
                 q_value = critic.model.predict_on_batch([np.array(s_t).reshape(1,26), np.array(a_t_original).reshape(1,2)])
                 target_q_value = critic.target_model.predict_on_batch([np.array(s_t).reshape(1,26), np.array(a_t_original).reshape(1,2)])
                 #f.write("Episode" + str(i) + " " + "Step" + str(j) + " " + "Action=" + str(ACTION) + " " + "aIDM=" + str(aIDM) + "\n")
-                error = r_t + GAMMA*target_q_value - q_value
-                buff.add(error, (s_t, a_t[0], r_t, s_t1, done))      #Add replay buffer
+                error = abs(r_t + GAMMA*target_q_value - q_value)
+                error = np.max(error)
+                # Add replay buffer
+                if error <= 0.5:
+                    buff0.add(s_t, a_t[0], r_t, s_t1, done)
+                elif error <= 1:
+                    buff1.add(s_t, a_t[0], r_t, s_t1, done)
+                elif error <= 2:
+                    buff2.add(s_t, a_t[0], r_t, s_t1, done)
+                else:
+                    buff3.add(s_t, a_t[0], r_t, s_t1, done)
+                # Do the batch update
+                batch0 = buff0.getBatch(BATCH_SIZE)
+                batch1 = buff1.getBatch(BATCH_SIZE)
+                batch2 = buff2.getBatch(BATCH_SIZE)
+                batch3 = buff3.getBatch(BATCH_SIZE)
 
-                #Do the batch update
-                batch = buff.getBatch(BATCH_SIZE)
-                states = np.asarray([e[0][1][0] for e in batch])
-                actions = np.asarray([e[0][1][1] for e in batch])
-                rewards = np.asarray([e[0][1][2] for e in batch])
-                new_states = np.asarray([e[0][1][3] for e in batch])
-                dones = np.asarray([e[0][1][4] for e in batch])
-                y_t = np.asarray([[e[0][1][2],e[0][1][2]] for e in batch])
+                batch = []
+                if batch0 == []:
+                    pass
+                else:
+                    batch.append(batch0)
+                if batch1 == []:
+                    pass
+                else:
+                    batch.append(batch1)
+                if batch2 == []:
+                    pass
+                else:
+                    batch.append(batch2)
+                if batch3 == []:
+                    pass
+                else:
+                    batch.append(batch3)
+                states = np.asarray([e[0][0] for e in batch])
+                actions = np.asarray([e[0][1] for e in batch])
+                rewards = np.asarray([e[0][2] for e in batch])
+                new_states = np.asarray([e[0][3] for e in batch])
+                dones = np.asarray([e[0][4] for e in batch])
+                y_t = np.asarray([[e[0][2], e[0][2]] for e in batch])
 
                 #length = new_states.shape[0]
 
@@ -267,11 +305,6 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                         y_t[k] = rewards[k]
                     else:
                         y_t[k] = rewards[k] + GAMMA*np.min(target_q_values[k])
-
-                    loss_for_replay = critic.model.train_on_batch([states, actions], y_t)
-                    idx = batch[k][0]
-                    buff.update(idx, loss_for_replay[k])
-
 
                 if (train_indicator):
 
