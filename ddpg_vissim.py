@@ -27,11 +27,10 @@ OU = OU()  # Ornstein-Uhlenbeck Process
 
 
 def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
-    BUFFER_SIZE0 = 100000
-    BUFFER_SIZE1 = 100000
-    BUFFER_SIZE2 = 100000
-    BUFFER_SIZE3 = 100000
-    BATCH_SIZE = 16
+    BUFFER_SIZE0 = 50000
+    BUFFER_SIZE1 = 50000
+    BUFFER_SIZE2 = 5000
+    BATCH_SIZE = 32
     GAMMA = 0.99
     TAU = 0.001  # Target Network HyperParameters
     LRA = 0.0001  # Learning rate for Actor
@@ -61,11 +60,10 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
     buff0 = ReplayBuffer(BUFFER_SIZE0)  # Create replay buffer
     buff1 = ReplayBuffer(BUFFER_SIZE1)
     buff2 = ReplayBuffer(BUFFER_SIZE2)
-    buff3 = ReplayBuffer(BUFFER_SIZE3)
     # Now load the weight
     print("Now we load the weight")
     try:
-        actor.model.load_weights("actormodel.h5")
+        actor.model.load_weights("train_actor_lanechanging.h5")
         print("actor Weight load successfully")
 
         actor.target_model.load_weights("actor_target_model.h5")
@@ -101,7 +99,7 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
         print("Vissim Experiment Start.")
         for i in range(episode_count):
 
-            print("Episode : " + str(i) + " Replay Buffer0 " + str(buff0.num_experiences) + " Replay Buffer1 " + str(buff1.num_experiences) + " Replay Buffer2 " + str(buff2.num_experiences) + " Replay Buffer3 " + str(buff3.num_experiences))
+            print("Episode : " + str(i) + " Replay Buffer0 " + str(buff0.num_experiences) + " Replay Buffer1 " + str(buff1.num_experiences) + " Replay Buffer2 " + str(buff2.num_experiences))
 
             data0 = tcpCliSock.recv(BUFSIZ)
             Vx0 = struct.unpack("30d", data0)[0]
@@ -143,7 +141,8 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
             s_t = env.make_observaton(raw_obs0)
 
             total_loss = 0
-            total_reward = 0
+            total_reward_cf = 0
+            total_reward_lc = 0
             total_q_value = 0
 
             for j in range(max_steps):
@@ -168,9 +167,9 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                     acceleration = a_t[0][1] * 8
 
                 if  0 <= a_t[0][0] and a_t[0][0] <= 0.1739523314093953:
-                    LaneChanging = 0
-                elif a_t[0][0] > 0.1739523314093953 and a_t[0][0] <= 1-0.1739523314093953:
                     LaneChanging = 1
+                elif a_t[0][0] > 0.1739523314093953 and a_t[0][0] <= 1-0.1739523314093953:
+                    LaneChanging = 0
                 else:
                     LaneChanging = 2
                     
@@ -235,14 +234,16 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
 
 
                 if LaneChanging == 1 or LaneChanging == 2:
-                    r_t = aux
+                    r_t_lanechange = aux
                 elif LaneChanging ==0:
-                    r_t = env.step(acceleration,LaneChanging,raw_obs)
+                    r_t_follow = env.step(acceleration,LaneChanging,raw_obs)
 
                 if i == 0 and j == 0:
-                    r_t = 0
+                    r_t_lanechange, r_t_follow = 0, 0
 
-                print('r_t=', r_t)
+                print('r_t_follow=', r_t_follow,'r_t_lanechange=',r_t_lanechange)
+
+                r_t = [r_t_follow, r_t_lanechange]
 
                 s_t1 = env.make_observaton(raw_obs)
 
@@ -252,19 +253,16 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                 error = abs(r_t + GAMMA*target_q_value - q_value)
                 error = np.max(error)
                 # Add replay buffer
-                if error <= 0.5:
+                if error <= 1:
                     buff0.add(s_t, a_t[0], r_t, s_t1, done)
-                elif error <= 1:
+                elif error <= 5:
                     buff1.add(s_t, a_t[0], r_t, s_t1, done)
-                elif error <= 2:
-                    buff2.add(s_t, a_t[0], r_t, s_t1, done)
                 else:
-                    buff3.add(s_t, a_t[0], r_t, s_t1, done)
+                    buff2.add(s_t, a_t[0], r_t, s_t1, done)
                 # Do the batch update
-                batch0 = buff0.getBatch(BATCH_SIZE)
-                batch1 = buff1.getBatch(BATCH_SIZE)
-                batch2 = buff2.getBatch(BATCH_SIZE)
-                batch3 = buff3.getBatch(BATCH_SIZE)
+                batch0 = buff0.getBatch(20)
+                batch1 = buff1.getBatch(10)
+                batch2 = buff2.getBatch(2)
 
                 batch = []
                 if batch0 == []:
@@ -279,16 +277,12 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                     pass
                 else:
                     batch.append(batch2)
-                if batch3 == []:
-                    pass
-                else:
-                    batch.append(batch3)
                 states = np.asarray([e[0][0] for e in batch])
                 actions = np.asarray([e[0][1] for e in batch])
                 rewards = np.asarray([e[0][2] for e in batch])
                 new_states = np.asarray([e[0][3] for e in batch])
                 dones = np.asarray([e[0][4] for e in batch])
-                y_t = np.asarray([[e[0][2], e[0][2]] for e in batch])
+                y_t = np.asarray([e[0][2] for e in batch])
 
                 #length = new_states.shape[0]
 
@@ -304,7 +298,7 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                     if dones[k]:
                         y_t[k] = rewards[k]
                     else:
-                        y_t[k] = rewards[k] + GAMMA*np.min(target_q_values[k])
+                        y_t[k] = rewards[k] + GAMMA*target_q_values[k]
 
                 if (train_indicator):
 
@@ -316,7 +310,8 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                     critic.target_train()
                     
                     
-                total_reward += r_t
+                total_reward_cf += r_t_follow
+                total_reward_lc += r_t_lanechange
                 total_loss += loss
                 total_q_value += q_value
 
@@ -357,9 +352,9 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
             ave_q = total_q_value/(j+1)
 
 
-            f.write("Episode" + str(i) + " " + "TotalReward=" + str(total_reward) + " " + "AverageLoss=" + str(ave_loss) + " " + "AverageValue=" + str(ave_q)  + "\n")
+            f.write("Episode" + str(i) + " " + "TotalReward_follow=" + str(total_reward_cf)+ " " + "TotalReward_lanechange=" + str(total_reward_lc) + " " + "AverageLoss=" + str(ave_loss) + " " + "AverageValue=" + str(ave_q)  + "\n")
 
-        print("TOTAL REWARD @ " +str(j) +"/" +str(i) +"-th Episode  : Reward " + str(total_reward))
+        print("TOTAL REWARD @ " +str(j) +"/" +str(i) +"-th Episode  : Reward_follow " + str(total_reward_cf)+"Reward_follow :" + str(total_reward_lc))
         print("Total Step: " + str(step))
         print("")
 
