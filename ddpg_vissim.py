@@ -251,7 +251,7 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                 target_q_value = critic.target_model.predict_on_batch([np.array(s_t).reshape(1,26), np.array(a_t_original).reshape(1,2)])
                 #f.write("Episode" + str(i) + " " + "Step" + str(j) + " " + "Action=" + str(ACTION) + " " + "aIDM=" + str(aIDM) + "\n")
                 error = abs(r_t + GAMMA*target_q_value - q_value)
-                error = np.max(error)
+                error = np.mean(error)
                 # Add replay buffer
                 if error <= 1:
                     buff0.add(s_t, a_t[0], r_t, s_t1, done)

@@ -96,7 +96,7 @@ class VissimEnv:
         #car-following
         if Dx2_diff < Vx + 4.25:
             reward = -1
-        if Dx2_diff > 5*Vx + 4.25:
+        if Dx2_diff > 5*Vx + 4.25 and Dx2_diff != 100:
             reward = -0.5
 
             
@@ -105,7 +105,7 @@ class VissimEnv:
                 reward = -1
 
         if abs(acceleration - self.pre_acceleration) > 0.56:
-            reward = -0.5
+            reward = -0.7
 
         #if LaneChanging == 1 or LaneChanging == 2:   #change a lane
             #if Dx5_diff < -Vx5_diff + 4.25:
