@@ -96,7 +96,7 @@ class VissimEnv:
         #car-following
         if Dx2_diff < Vx + 4.25:
             reward = -1
-        if Dx2_diff > 5*Vx + 4.25 and Dx2_diff != 100:
+        if Dx2_diff > 5*Vx + 4.25:
             reward = -0.5
 
             
