@@ -237,11 +237,11 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                 if LaneChanging == 1 or LaneChanging == 2:
                     r_t_lanechange = aux
                     if aux == -0.8:
-                        r_t_follow = env.step(acceleration,LaneChanging,raw_obs)
+                        r_t_follow = env.step(acceleration,raw_obs)
                     else:
                         r_t_follow = 0
                 elif LaneChanging ==0:
-                    r_t_follow = env.step(acceleration,LaneChanging,raw_obs)
+                    r_t_follow = env.step(acceleration,raw_obs)
                     r_t_lanechange = 0
 
                 if i == 0 and j == 0:

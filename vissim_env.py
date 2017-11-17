@@ -20,7 +20,7 @@ class VissimEnv:
         self.time_step=0
         self.pre_LaneChanging=0
 
-    def step(self, acceleration,LaneChanging,raw_obs):
+    def step(self, acceleration,raw_obs):
        #print("Step")
 
         # Make an obsevation from a raw observation vector from Vissim
