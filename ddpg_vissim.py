@@ -64,7 +64,7 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
     # Now load the weight
     print("Now we load the weight")
     try:
-        actor.model.load_weights("train_actor_lanechanging.h5")
+        actor.model.load_weights("actormodel.h5")
         print("actor Weight load successfully")
 
         actor.target_model.load_weights("actor_target_model.h5")
@@ -236,7 +236,10 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
 
                 if LaneChanging == 1 or LaneChanging == 2:
                     r_t_lanechange = aux
-                    r_t_follow = 0
+                    if aux == -0.8:
+                        r_t_follow = env.step(acceleration,LaneChanging,raw_obs)
+                    else:
+                        r_t_follow = 0
                 elif LaneChanging ==0:
                     r_t_follow = env.step(acceleration,LaneChanging,raw_obs)
                     r_t_lanechange = 0
