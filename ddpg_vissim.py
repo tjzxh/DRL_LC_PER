@@ -27,7 +27,7 @@ OU = OU()  # Ornstein-Uhlenbeck Process
 
 
 def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
-    BUFFER_SIZE = 100000
+    BUFFER_SIZE = 1000000
     #BUFFER_SIZE1 = 50000
     #BUFFER_SIZE2 = 5000
     BATCH_SIZE = 32
@@ -41,7 +41,7 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
 
     np.random.seed(1337)
 
-    EXPLORE = 100000
+    EXPLORE = 1000000
     episode_count = 20000
     max_steps = 5299
     done = 0
@@ -64,7 +64,7 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
     # Now load the weight
     print("Now we load the weight")
     try:
-        actor.model.load_weights("actormodel.h5")
+        actor.model.load_weights("train_actor_lanechanging.h5")
         print("actor Weight load successfully")
 
         actor.target_model.load_weights("actor_target_model.h5")
@@ -146,6 +146,9 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
             total_reward_lc = 0
             total_q_value = 0
 
+            Dx2_diff = Dx2_diff0
+            Vx = Vx0
+            Vx2_diff = Vx2_diff0
             for j in range(max_steps):
                 loss = 0
                 epsilon -= 1.0 / EXPLORE
@@ -166,6 +169,19 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                     acceleration = a_t[0][1] * 3.5
                 else:
                     acceleration = a_t[0][1] * 8
+
+                r_t_first = 0
+                #if Dx2_diff < 2*Vx + 4.25:
+                    #if acceleration > 0:
+                        #r_t_first = -1
+                        #acceleration = -acceleration
+                if Dx2_diff < 1.2*Vx + 4.25:
+                    #if Vx2_diff > 0:
+                    if acceleration < -abs(Vx2_diff)/1.2:
+                        pass
+                    else:
+                        acceleration = -abs(Vx2_diff)/1.2
+                        r_t_first = -1
 
                 if  0 <= a_t[0][0] and a_t[0][0] <= 0.1739523314093953:
                     LaneChanging = 1
@@ -237,11 +253,17 @@ def playGame(train_indicator=1):  # 1 means Train, 0 means simply Run
                 if LaneChanging == 1 or LaneChanging == 2:
                     r_t_lanechange = aux
                     if aux == -0.8:
-                        r_t_follow = env.step(acceleration,raw_obs)
+                        if r_t_first == 0:
+                            r_t_follow = env.step(acceleration, raw_obs)
+                        else:
+                            r_t_follow = r_t_first
                     else:
                         r_t_follow = 0
                 elif LaneChanging ==0:
-                    r_t_follow = env.step(acceleration,raw_obs)
+                    if r_t_first == 0:
+                        r_t_follow = env.step(acceleration,raw_obs)
+                    else:
+                        r_t_follow = r_t_first
                     r_t_lanechange = 0
 
                 if i == 0 and j == 0:
